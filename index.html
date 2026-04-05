@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Robot Path Planner — A* Algorithm</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:#f8f7f4;color:#2c2c2a;padding:2rem}
+h1{font-size:22px;font-weight:500;margin-bottom:4px}
+p.sub{font-size:14px;color:#888780;margin-bottom:1.5rem}
+#controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:1rem}
+.ctrl-group{display:flex;align-items:center;gap:6px;font-size:13px;color:#5f5e5a}
+select,button{font-size:13px;padding:6px 12px;border-radius:8px;border:0.5px solid #d3d1c7;background:#fff;cursor:pointer}
+button:hover{background:#f1efe8}
+button:active{transform:scale(0.98)}
+#grid-wrap{overflow:auto;margin-bottom:1rem}
+#grid{display:grid;gap:2px;width:fit-content;cursor:crosshair;user-select:none}
+.cell{width:30px;height:30px;border-radius:4px;background:#f1efe8;border:0.5px solid #d3d1c7;transition:background 0.08s;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:500}
+.cell.wall{background:#2c2c2a}
+.cell.start{background:#1d9e75;color:#fff}
+.cell.goal{background:#d85a30;color:#fff}
+.cell.open{background:#b5d4f4}
+.cell.closed{background:#cecbf6}
+.cell.path{background:#fac775}
+#legend{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:1rem}
+.leg{display:flex;align-items:center;gap:5px;font-size:12px;color:#5f5e5a}
+.swatch{width:14px;height:14px;border-radius:3px;flex-shrink:0}
+#stats{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:1rem}
+.stat{background:#fff;border:0.5px solid #d3d1c7;border-radius:8px;padding:8px 14px;font-size:13px}
+.stat span{font-weight:500}
+.stat label{color:#5f5e5a}
+#msg{font-size:13px;color:#5f5e5a;min-height:18px;margin-bottom:8px}
+</style>
+</head>
+<body>
+<h1>Robot Path Planner</h1>
+<p class="sub">A* algorithm simulation — draw walls, set start/goal, and watch the robot find the shortest path.</p>
+
+<div id="controls">
+  <div class="ctrl-group">
+    <label>Mode:</label>
+    <select id="mode-sel">
+      <option value="wall">Draw walls</option>
+      <option value="start">Set start</option>
+      <option value="goal">Set goal</option>
+      <option value="erase">Erase</option>
+    </select>
+  </div>
+  <div class="ctrl-group">
+    <label>Size:</label>
+    <select id="size-sel">
+      <option value="15">15×15</option>
+      <option value="20" selected>20×20</option>
+      <option value="25">25×25</option>
+    </select>
+  </div>
+  <div class="ctrl-group">
+    <label>Speed:</label>
+    <select id="speed-sel">
+      <option value="80">Slow</option>
+      <option value="30" selected>Medium</option>
+      <option value="5">Fast</option>
+      <option value="0">Instant</option>
+    </select>
+  </div>
+  <button onclick="runAStar()">▶ Run A*</button>
+  <button onclick="clearPath()">Clear path</button>
+  <button onclick="clearAll()">Reset grid</button>
+  <button onclick="randomMaze()">Random maze</button>
+</div>
+
+<div id="legend">
+  <div class="leg"><div class="swatch" style="background:#1d9e75"></div>Start (S)</div>
+  <div class="leg"><div class="swatch" style="background:#d85a30"></div>Goal (G)</div>
+  <div class="leg"><div class="swatch" style="background:#2c2c2a"></div>Wall</div>
+  <div class="leg"><div class="swatch" style="background:#b5d4f4"></div>Open (frontier)</div>
+  <div class="leg"><div class="swatch" style="background:#cecbf6"></div>Closed (visited)</div>
+  <div class="leg"><div class="swatch" style="background:#fac775"></div>Shortest path</div>
+</div>
+
+<div id="stats">
+  <div class="stat"><label>Nodes visited: </label><span id="st-visited">—</span></div>
+  <div class="stat"><label>Path length: </label><span id="st-path">—</span></div>
+  <div class="stat"><label>Cost: </label><span id="st-cost">—</span></div>
+</div>
+
+<div id="msg">Click cells to place walls, then click ▶ Run A*</div>
+<div id="grid-wrap"><div id="grid"></div></div>
+
+<script>
+let N=20,grid=[],startR=2,startC=2,goalR,goalC;
+let running=false,drawing=false;
+
+function initGrid(n){
+  N=n;goalR=N-3;goalC=N-3;
+  grid=Array.from({length:N},()=>Array(N).fill(0));
+  renderGrid();updateStats('—','—','—');
+}
+
+function renderGrid(){
+  const g=document.getElementById('grid');
+  g.style.gridTemplateColumns=`repeat(${N},30px)`;
+  g.innerHTML='';
+  for(let r=0;r<N;r++) for(let c=0;c<N;c++){
+    const d=document.createElement('div');
+    d.className='cell';d.dataset.r=r;d.dataset.c=c;
+    d.addEventListener('mousedown',e=>{e.preventDefault();drawing=true;applyDraw(r,c)});
+    d.addEventListener('mouseover',()=>{if(drawing)applyDraw(r,c)});
+    refreshCell(d,r,c);g.appendChild(d);
+  }
+  document.addEventListener('mouseup',()=>drawing=false);
+}
+
+function cellEl(r,c){return document.querySelector(`.cell[data-r="${r}"][data-c="${c}"]`)}
+
+function refreshCell(el,r,c){
+  el=el||cellEl(r,c);if(!el)return;
+  el.className='cell';
+  if(r===startR&&c===startC){el.classList.add('start');el.textContent='S';}
+  else if(r===goalR&&c===goalC){el.classList.add('goal');el.textContent='G';}
+  else if(grid[r][c]===1){el.classList.add('wall');el.textContent='';}
+  else el.textContent='';
+}
+
+function applyDraw(r,c){
+  if(running)return;
+  const mode=document.getElementById('mode-sel').value;
+  if(mode==='start'){startR=r;startC=c;}
+  else if(mode==='goal'){goalR=r;goalC=c;}
+  else if(mode==='wall'){if(!(r===startR&&c===startC)&&!(r===goalR&&c===goalC))grid[r][c]=1;}
+  else if(mode==='erase')grid[r][c]=0;
+  for(let rr=0;rr<N;rr++) for(let cc=0;cc<N;cc++) refreshCell(null,rr,cc);
+}
+
+function clearPath(){
+  document.querySelectorAll('.cell.open,.cell.closed,.cell.path').forEach(el=>{
+    el.classList.remove('open','closed','path');el.textContent='';
+  });
+  for(let r=0;r<N;r++) for(let c=0;c<N;c++) refreshCell(null,r,c);
+  updateStats('—','—','—');setMsg('Path cleared.');
+}
+
+function clearAll(){running=false;grid=Array.from({length:N},()=>Array(N).fill(0));renderGrid();updateStats('—','—','—');setMsg('Grid reset.');}
+
+function randomMaze(){
+  if(running)return;
+  grid=Array.from({length:N},()=>Array(N).fill(0));
+  for(let r=0;r<N;r++) for(let c=0;c<N;c++){
+    if((r===startR&&c===startC)||(r===goalR&&c===goalC))continue;
+    if(Math.random()<0.3)grid[r][c]=1;
+  }
+  renderGrid();updateStats('—','—','—');setMsg('Random maze generated. Click ▶ Run A*');
+}
+
+function setMsg(t){document.getElementById('msg').textContent=t;}
+function updateStats(v,p,c){
+  document.getElementById('st-visited').textContent=v;
+  document.getElementById('st-path').textContent=p;
+  document.getElementById('st-cost').textContent=c;
+}
+
+function h(r,c){return(Math.abs(r-goalR)+Math.abs(c-goalC))*10;}
+
+async function runAStar(){
+  if(running)return;
+  clearPath();running=true;
+  const btn=document.querySelector('button');btn.textContent='Running…';
+  const delay=parseInt(document.getElementById('speed-sel').value);
+  const dirs=[[0,1,10],[1,0,10],[0,-1,10],[-1,0,10],[1,1,14],[1,-1,14],[-1,1,14],[-1,-1,14]];
+  const gScore=Array.from({length:N},()=>Array(N).fill(Infinity));
+  const fScore=Array.from({length:N},()=>Array(N).fill(Infinity));
+  const came=Array.from({length:N},()=>Array(N).fill(null));
+  const openSet=new Set(),closedSet=new Set();
+  const key=(r,c)=>r*N+c;
+  gScore[startR][startC]=0;fScore[startR][startC]=h(startR,startC);
+  openSet.add(key(startR,startC));
+  let visited=0;
+  const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+
+  while(openSet.size>0){
+    if(!running)break;
+    let best=null,bf=Infinity;
+    openSet.forEach(k=>{const r=Math.floor(k/N),c=k%N;if(fScore[r][c]<bf){bf=fScore[r][c];best=k;}});
+    const cr=Math.floor(best/N),cc=best%N;
+    if(cr===goalR&&cc===goalC){
+      let path=[],r=cr,c=cc,plen=0,pcost=0;
+      while(came[r][c]){const[pr,pc,sc]=came[r][c];path.push([r,c]);pcost+=sc;r=pr;c=pc;plen++;}
+      path.push([startR,startC]);path.reverse();
+      for(const[pr,pc]of path){
+        if((pr===startR&&pc===startC)||(pr===goalR&&pc===goalC))continue;
+        const el=cellEl(pr,pc);if(el)el.className='cell path';
+      }
+      updateStats(visited,plen,pcost);
+      setMsg(`Path found! ${plen} steps, cost ${pcost}.`);
+      btn.textContent='▶ Run A*';running=false;return;
+    }
+    openSet.delete(best);closedSet.add(best);visited++;
+    if(!(cr===startR&&cc===startC)){const el=cellEl(cr,cc);if(el)el.className='cell closed';}
+    for(const[dr,dc,sc]of dirs){
+      const nr=cr+dr,nc=cc+dc;
+      if(nr<0||nr>=N||nc<0||nc>=N||grid[nr][nc]===1)continue;
+      if(closedSet.has(key(nr,nc)))continue;
+      if(dr!==0&&dc!==0&&(grid[cr][nc]===1||grid[nr][cc]===1))continue;
+      const tentG=gScore[cr][cc]+sc;
+      if(tentG<gScore[nr][nc]){
+        came[nr][nc]=[cr,cc,sc];gScore[nr][nc]=tentG;fScore[nr][nc]=tentG+h(nr,nc);
+        openSet.add(key(nr,nc));
+        if(!(nr===goalR&&nc===goalC)){const el=cellEl(nr,nc);if(el&&!el.classList.contains('closed'))el.className='cell open';}
+      }
+    }
+    updateStats(visited,'—','—');
+    if(delay>0)await sleep(delay);
+  }
+  if(running)setMsg('No path found! The goal is unreachable.');
+  btn.textContent='▶ Run A*';running=false;
+}
+
+document.getElementById('size-sel').onchange=e=>initGrid(parseInt(e.target.value));
+initGrid(20);
+</script>
+</body>
+</html>
