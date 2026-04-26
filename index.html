@@ -109,8 +109,8 @@ function renderGrid(){
     d.addEventListener('mouseover',()=>{if(drawing)applyDraw(r,c)});
     refreshCell(d,r,c);g.appendChild(d);
   }
-  document.addEventListener('mouseup',()=>drawing=false);
 }
+document.addEventListener('mouseup',()=>drawing=false);
 
 function cellEl(r,c){return document.querySelector(`.cell[data-r="${r}"][data-c="${c}"]`)}
 
