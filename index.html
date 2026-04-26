@@ -159,9 +159,11 @@ function updateStats(v,p,c){
   document.getElementById('st-path').textContent=p;
   document.getElementById('st-cost').textContent=c;
 }
-
-function h(r,c){return(Math.abs(r-goalR)+Math.abs(c-goalC))*10;}
-
+function h(r, c) {
+  const dr = Math.abs(r - goalR);
+  const dc = Math.abs(c - goalC);
+  return 10 * (dr + dc) - 6 * Math.min(dr, dc);
+}
 async function runAStar(){
   if(running)return;
   clearPath();running=true;
