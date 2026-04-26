@@ -93,6 +93,7 @@ let N=20,grid=[],startR=2,startC=2,goalR,goalC;
 let running=false,drawing=false;
 
 function initGrid(n){
+  running=false;
   N=n;goalR=N-3;goalC=N-3;
   grid=Array.from({length:N},()=>Array(N).fill(0));
   renderGrid();updateStats('—','—','—');
