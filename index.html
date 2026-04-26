@@ -115,7 +115,7 @@ function renderGrid(){
 }
 document.addEventListener('mouseup',()=>drawing=false);
 
-function cellEl(r,c){return document.querySelector(`.cell[data-r="${r}"][data-c="${c}"]`)}
+function cellEl(r,c){return cellMap[`${r},${c}`];}
 
 function refreshCell(el,r,c){
   el=el||cellEl(r,c);if(!el)return;
