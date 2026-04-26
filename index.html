@@ -168,7 +168,7 @@ function h(r, c) {
 async function runAStar(){
   if(running)return;
   clearPath();running=true;
-  const btn=document.querySelector('button');btn.textContent='Running…';
+  const btn=document.getElementById('run-btn');btn.textContent='Running…';
   const delay=parseInt(document.getElementById('speed-sel').value);
   const dirs=[[0,1,10],[1,0,10],[0,-1,10],[-1,0,10],[1,1,14],[1,-1,14],[-1,1,14],[-1,-1,14]];
   const gScore=Array.from({length:N},()=>Array(N).fill(Infinity));
