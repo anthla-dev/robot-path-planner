@@ -132,8 +132,8 @@ function applyDraw(r,c){
   else if(mode==='erase')grid[r][c]=0;
   for(let rr=0;rr<N;rr++) for(let cc=0;cc<N;cc++) refreshCell(null,rr,cc);
 }
-
 function clearPath(){
+  running=false;
   document.querySelectorAll('.cell.open,.cell.closed,.cell.path').forEach(el=>{
     el.classList.remove('open','closed','path');el.textContent='';
   });
