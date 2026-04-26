@@ -129,11 +129,11 @@ function refreshCell(el,r,c){
 function applyDraw(r,c){
   if(running)return;
   const mode=document.getElementById('mode-sel').value;
-  if(mode==='start'){startR=r;startC=c;}
-  else if(mode==='goal'){goalR=r;goalC=c;}
+  if(mode==='start'&&!(r===goalR&&c===goalC)){const pr=startR,pc=startC;startR=r;startC=c;refreshCell(null,pr,pc);}
+  else if(mode==='goal'&&!(r===startR&&c===startC)){const pr=goalR,pc=goalC;goalR=r;goalC=c;refreshCell(null,pr,pc);}
   else if(mode==='wall'){if(!(r===startR&&c===startC)&&!(r===goalR&&c===goalC))grid[r][c]=1;}
   else if(mode==='erase')grid[r][c]=0;
-  for(let rr=0;rr<N;rr++) for(let cc=0;cc<N;cc++) refreshCell(null,rr,cc);
+  refreshCell(null,r,c);
 }
 function clearPath(){
   running=false;
